@@ -81,7 +81,7 @@ router.put('/:id', async function (req, res) {
 });
 
 router.delete('/:id', async function (req, res) {
-    var user = await mongoose.connection.transaction(async function (session) {
+    await mongoose.connection.transaction(async function (session) {
         var existing = await helpers.findResource(User, req.params.id, session);
         await Task.updateMany(
             { assignedUser: existing._id.toString() },
@@ -89,9 +89,8 @@ router.delete('/:id', async function (req, res) {
             { session: session }
         );
         await existing.deleteOne({ session: session });
-        return existing.toObject();
     });
-    res.status(200).json({ message: 'User deleted', data: user });
+    res.status(204).end();
 });
 
 module.exports = router;

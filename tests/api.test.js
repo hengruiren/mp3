@@ -39,15 +39,20 @@ after(async function () {
     }
 });
 
-async function request(method, path, body, status = 200) {
+async function request(method, path, body, status = method === 'DELETE' ? 204 : 200) {
     var response = await fetch(base + path, {
         method: method,
         headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(20000)
     });
-    var result = await response.json();
-    assert.equal(response.status, status, method + ' ' + path + ': ' + result.message);
+    var text = await response.text();
+    assert.equal(response.status, status, method + ' ' + path + ': ' + text);
+    if (status === 204) {
+        assert.equal(text, '', 'A 204 response must have an empty body');
+        return;
+    }
+    var result = JSON.parse(text);
     assert.equal(typeof result.message, 'string');
     assert.ok(Object.hasOwn(result, 'data'));
     return result.data;
