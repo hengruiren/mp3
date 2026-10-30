@@ -12,14 +12,14 @@ var app = express();
 // Use environment defined port or 3000
 var port = process.env.PORT || 3000;
 
-// Connect to a MongoDB --> Uncomment this once you have a connection string!!
-//mongoose.connect(process.env.MONGODB_URI).catch(function (err) { console.error('MongoDB connection error:', err.message); });
-
 // Allow CORS so that backend and frontend could be put on different servers
 var allowCrossDomain = function (req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Headers", "X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept");
     res.header("Access-Control-Allow-Methods", "POST, GET, PUT, DELETE, OPTIONS");
+    if (req.method === 'OPTIONS') {
+        return res.status(204).end();
+    }
     next();
 };
 app.use(allowCrossDomain);
@@ -31,6 +31,35 @@ app.use(express.json());
 // Use routes as a module (see index.js)
 require('./routes')(app, router);
 
-// Start the server
-app.listen(port);
-console.log('Server running on port ' + port);
+// Start accepting requests only after the database is connected.
+async function startServer() {
+    if (!process.env.MONGODB_URI) {
+        console.error('Missing MONGODB_URI. Set it in your .env file.');
+        process.exitCode = 1;
+        return;
+    }
+
+    try {
+        await mongoose.connect(process.env.MONGODB_URI, {
+            serverSelectionTimeoutMS: 10000
+        });
+        await require('./models/user').init();
+        await require('./models/task').init();
+    } catch (err) {
+        console.error('MongoDB connection failed. Check your credentials, network access and Atlas IP access list.');
+        await mongoose.disconnect();
+        process.exitCode = 1;
+        return;
+    }
+
+    console.log('MongoDB connected');
+    app.listen(port, function () {
+        console.log('Server running on port ' + port);
+    });
+}
+
+if (require.main === module) {
+    startServer();
+}
+
+module.exports = app;
